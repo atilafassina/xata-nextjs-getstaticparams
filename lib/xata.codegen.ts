@@ -60,6 +60,15 @@ let instance: XataClient | undefined = undefined;
 export const getXataClient = () => {
   if (instance) return instance;
 
-  instance = new XataClient();
+  instance = new XataClient({
+    fetch: (path, options) => {
+      return fetch(path, {
+        ...options,
+        next: {
+          revalidate: process.env.NODE_ENV === "development" ? 1 : 15,
+        },
+      });
+    },
+  });
   return instance;
 };
