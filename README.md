@@ -1,38 +1,108 @@
-This is a [Next.js](https://nextjs.org/) project bootstrapped with [`create-next-app`](https://github.com/vercel/next.js/tree/canary/packages/create-next-app).
+This is contrived issue reproduction between Next.js and Xata.
 
-## Getting Started
+## Issue 🌋
 
-First, run the development server:
+When using Xata in a dynamic route with `getStaticParams` it will cause a runtime shift between first build and rebuilds. This happens because `incrementalCache` seems to switch values from first build.
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
+> ❗️ Issue happens only in development
+
+Deployed app: [xata-nextjs-getstaticparams.vercel.app](https://xata-nextjs-getstaticparams.vercel.app/)
+
+### Workaround
+
+Passing a hardcoded `next.revalidate` option on build will stick it to either dynamic or static.
+
+<details>
+    <summary>Dynamic</summary>
+    
+```ts
+const xata = new XataClient({
+    fetch: (path, options) => {
+      return fetch(path, {
+        ...options,
+        next: {
+          revalidate: false,
+        },
+      });
+    },
+  });
+  ```
+
+</details>
+<details>
+    <summary>Static</summary>
+
+```ts
+const xata = new XataClient({
+  fetch: (path, options) => {
+    return fetch(path, {
+      ...options,
+      next: {
+        revalidate: 10,
+      },
+    });
+  },
+});
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+</details>
+<details>
+<summary>Environment Based</summary>
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```ts
+const xata = new XataClient({
+  fetch: (path, options) => {
+    return fetch(path, {
+      ...options,
+      next: {
+        revalidate: process.env.NODE_ENV === "development" ? 0 : 60,
+      },
+    });
+  },
+});
+```
 
-[API routes](https://nextjs.org/docs/api-routes/introduction) can be accessed on [http://localhost:3000/api/hello](http://localhost:3000/api/hello). This endpoint can be edited in `pages/api/hello.ts`.
+</details>
 
-The `pages/api` directory is mapped to `/api/*`. Files in this directory are treated as [API routes](https://nextjs.org/docs/api-routes/introduction) instead of React pages.
+The problem with the workaround is that the user will need to always generate their own instance instead of leveraging the codegen to its maximum potential.
 
-This project uses [`next/font`](https://nextjs.org/docs/basic-features/font-optimization) to automatically optimize and load Inter, a custom Google Font.
+## Ideal Solution
 
-## Learn More
+The SDK can uses the `fetch` instance from Next.js without needing to hardcode any default value.
 
-To learn more about Next.js, take a look at the following resources:
+## Run App
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+```sh
+pnpm i && pnpm dev
+```
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js/) - your feedback and contributions are welcome!
+Serves in [localhost:3000](http://localhost:3000)
 
-## Deploy on Vercel
+### Environment Variable
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+This app requires a Xata account, once you have one add your [access token](https://xata.io/docs/getting-started/api-keys) to your `.env` or `.env.local` to run it locally.
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/deployment) for more details.
+```
+XATA_API_KEY=<token>
+```
+
+### Database
+
+The `.xatarc` carries the build configuration to your app. `codegen.output` will tell the CLI where to put the generated SDK code. While the `databaseURL` is your Database URL. You can generate it using the [Xata CLI](https://xata.io/docs/getting-started/installation), manually, or via the VS Code Extension.
+
+> 💡 It is also possible to pass `--databaseUrl` and `--output` flags to the `xata:codegen` task and skip the `.xatarc` completely.
+
+### Minimal Schema
+
+**Posts**
+| Column | Type |
+| ------- | -------- |
+| `id` | `string` |
+| `slug` | `string` |
+| `title` | `string` |
+
+> 💡 You can use the **Example Database** on Xata Web UI.
+
+---
+
+Thanks to @Sam-Apostel for first finding this at [sam-apostel/blog](https://github.com/Sam-Apostel/blog)

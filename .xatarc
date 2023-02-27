@@ -1,0 +1,6 @@
+{
+  "databaseURL": "https://demos-urucbe.us-east-1.xata.sh/db/capsulecorp",
+  "codegen": {
+    "output": "lib/xata.codegen.ts"
+  }
+}
